@@ -1,19 +1,20 @@
-name: Lint i18n
-description: Lint i18n JSON key structure (naming conventions, nesting depth, missing keys across locales)
-
+name: 'Lint i18n'
+description: 'Lint i18n JSON key structure (naming conventions, nesting depth, missing keys across locales)'
+branding:
+  icon: 'database'
+  color: 'green'
 inputs:
   path:
-    description: Path to the i18n directory containing locale JSON files
+    description: 'Path to the i18n directory containing locale JSON files'
     required: true
   rules:
-    description: Optional JSON string of lint rules to apply
+    description: 'Optional JSON string of lint rules to apply'
     required: false
     default: '{}'
-
 outputs:
   total-files-analyzed:
-    description: Number of locale files analyzed
-
+    description: 'Number of locale files analyzed'
 runs:
-  using: node20
-  main: dist/index.js
+  using: 'node20'
+  main: 'dist/index.js'
+  
