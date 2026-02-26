@@ -1,0 +1,28 @@
+{
+  "name": "lint-i18n",
+  "type": "module",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.30.1",
+  "description": "GitHub Action to lint i18n JSON key structure",
+  "author": "",
+  "license": "ISC",
+  "keywords": [],
+  "main": "lib/main.js",
+  "scripts": {
+    "build": "tsc",
+    "lint": "oxlint --deny-warnings .",
+    "package": "ncc build src/main.ts --source-map --out dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.0",
+    "@actions/github": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@vercel/ncc": "^0.38.4",
+    "oxlint": "^1.50.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

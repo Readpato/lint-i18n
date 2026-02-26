@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["node"],
+  "ignorePatterns": [
+    ".nuxt",
+    "**/.nuxt/**",
+    ".output",
+    "**/.output/**",
+    "node_modules",
+    "**/node_modules/**",
+    "public",
+    "**/public/**"
+  ],
+  "rules": {
+    "no-console": ["error", { "allow": ["info", "warn", "trace", "error", "group", "groupEnd"] }],
+    "curly": ["error", "all"]
+  }
+}

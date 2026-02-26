@@ -1,0 +1,21 @@
+// Based on https://www.totaltypescript.com/tsconfig-cheat-sheet
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "NodeNext",
+    "rootDir": "./src",
+    "outDir": "./lib",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "sourceMap": true
+  },
+  "exclude": ["dist", "lib", "node_modules", "tests"]
+}
