@@ -58,11 +58,12 @@ export function validateLocaleValues(data: Record<string, unknown>) {
 
 /** Detects flat-key namespace conflicts where a key is both a leaf value and a prefix of another key. */
 export function detectFlatKeyNamespaceConflicts(localeData: FlatKeyLocaleData) {
-  if (Object.keys(localeData).length === 0) {
+  const localeKeys = new Set(Object.keys(localeData))
+
+  if (localeKeys.size === 0) {
     throw new Error('Cannot detect conflicts in an empty locale object')
   }
 
-  const localeKeys = new Set(Object.keys(localeData))
   const conflicts: NamespaceConflict[] = []
 
   for (const key of localeKeys) {
@@ -72,17 +73,17 @@ export function detectFlatKeyNamespaceConflicts(localeData: FlatKeyLocaleData) {
       continue
     }
 
-    for (let segmentIndex = 1; segmentIndex < segments.length; segmentIndex++) {
-      const parentKeySegment = segments.slice(0, segmentIndex).join('.')
+    let prefix = segments[0] ?? ''
 
-      if (!localeKeys.has(parentKeySegment)) {
-        continue
+    for (let segmentIndex = 1; segmentIndex < segments.length; segmentIndex++) {
+      if (localeKeys.has(prefix)) {
+        conflicts.push({
+          leafKey: prefix,
+          conflictingDescendantKey: key,
+        })
       }
 
-      conflicts.push({
-        leafKey: parentKeySegment,
-        conflictingDescendantKey: key,
-      })
+      prefix += `.${segments[segmentIndex]}`
     }
   }
 
@@ -96,35 +97,37 @@ export async function analyzeLocaleFile(filePath: string): Promise<LocaleFileAna
     const parsed: unknown = JSON.parse(content)
 
     if (!isPlainJsonObject(parsed)) {
-      return { filePath, conflicts: [], error: 'File does not contain a JSON object' }
+      return { filePath, conflicts: [], invalidValues: [], error: 'File does not contain a JSON object' }
     }
 
     if (Object.keys(parsed).length === 0) {
-      return { filePath, conflicts: [], error: 'File contains no translation keys' }
+      return { filePath, conflicts: [], invalidValues: [], error: 'File contains no translation keys' }
     }
 
-    const keyLineMap = buildKeyLineMap(content)
     const { validData, invalidValues } = validateLocaleValues(parsed)
 
-    if (invalidValues.length > 0) {
+    const hasValidKeys = invalidValues.length < Object.keys(parsed).length
+    const conflicts = hasValidKeys
+      ? detectFlatKeyNamespaceConflicts(validData)
+      : []
+
+    if (invalidValues.length > 0 || conflicts.length > 0) {
+      const keyLineMap = buildKeyLineMap(content)
+
       for (const invalidValue of invalidValues) {
         invalidValue.line = keyLineMap.get(invalidValue.key)
       }
 
-      return { filePath, conflicts: [], invalidValues }
+      for (const conflict of conflicts) {
+        conflict.leafKeyLine = keyLineMap.get(conflict.leafKey)
+        conflict.conflictingDescendantKeyLine = keyLineMap.get(conflict.conflictingDescendantKey)
+      }
     }
 
-    const conflicts = detectFlatKeyNamespaceConflicts(validData)
-
-    for (const conflict of conflicts) {
-      conflict.leafKeyLine = keyLineMap.get(conflict.leafKey)
-      conflict.conflictingDescendantKeyLine = keyLineMap.get(conflict.conflictingDescendantKey)
-    }
-
-    return { filePath, conflicts }
+    return { filePath, conflicts, invalidValues }
   }
   catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return { filePath, conflicts: [], error: message }
+    return { filePath, conflicts: [], invalidValues: [], error: message }
   }
 }

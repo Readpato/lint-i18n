@@ -29,5 +29,5 @@ export interface LocaleFileAnalysisResult {
   /** Present when the file could not be read or parsed. */
   error?: string
   /** Non-string values detected in the file. */
-  invalidValues?: InvalidValueError[]
+  invalidValues: InvalidValueError[]
 }
