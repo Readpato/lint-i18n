@@ -3,15 +3,6 @@ import * as core from '@actions/core'
 import { analyzeLocaleFile } from './conflict-detection.js'
 import { findJsonFilesRecursively } from './file-discovery.js'
 
-function formatLinePrefix(line: number | undefined) {
-  return line !== undefined ? `Line ${line}: ` : ''
-}
-
-function reportError(filePath: string, line: number | undefined, message: string) {
-  core.error(message, { file: filePath, startLine: line })
-  return `  ${formatLinePrefix(line)}${message}`
-}
-
 export async function run() {
   try {
     const path = core.getInput('path', { required: true })
@@ -28,38 +19,30 @@ export async function run() {
 
     const analysisResults = await Promise.all(jsonFiles.map(file => analyzeLocaleFile(file)))
 
-    let skippedFileCount = 0
+    const skippedResults = analysisResults.filter(result => result.error)
     let totalConflictCount = 0
     let totalInvalidValueCount = 0
     let totalFilesWithErrors = 0
 
-    for (const result of analysisResults) {
-      if (result.error) {
-        core.info('')
-        core.warning(`Skipping ${result.filePath}: ${result.error}`)
-        skippedFileCount++
-        continue
-      }
+    const lintedResults = analysisResults.filter(result => !result.error)
 
-      const fileErrors: string[] = []
+    for (const result of lintedResults) {
+      const errorCount = result.invalidValues.length + result.conflicts.length
 
-      for (const invalidValue of result.invalidValues) {
-        const message = `Key "${invalidValue.key}" has invalid value type "${invalidValue.actualType}" (expected "string")`
-        fileErrors.push(reportError(result.filePath, invalidValue.line, message))
-      }
+      if (errorCount > 0) {
+        core.startGroup(result.filePath)
 
-      for (const conflict of result.conflicts) {
-        const message = `Key "${conflict.leafKey}" conflicts with "${conflict.conflictingDescendantKey}" — a key cannot be both a value and a namespace prefix`
-        fileErrors.push(reportError(result.filePath, conflict.leafKeyLine, message))
-      }
-
-      if (fileErrors.length > 0) {
-        core.info('')
-        core.info(result.filePath)
-        for (const errorLine of fileErrors) {
-          core.info(errorLine)
+        for (const invalidValue of result.invalidValues) {
+          const message = `Key "${invalidValue.key}" has invalid value type "${invalidValue.actualType}" (expected "string")`
+          core.error(message, { file: result.filePath, startLine: invalidValue.line })
         }
 
+        for (const conflict of result.conflicts) {
+          const message = `Key "${conflict.leafKey}" conflicts with "${conflict.conflictingDescendantKey}" — a key cannot be both a value and a namespace prefix`
+          core.error(message, { file: result.filePath, startLine: conflict.leafKeyLine })
+        }
+
+        core.endGroup()
         totalFilesWithErrors++
       }
 
@@ -67,8 +50,16 @@ export async function run() {
       totalInvalidValueCount += result.invalidValues.length
     }
 
+    if (skippedResults.length > 0) {
+      core.startGroup(`Skipped files (${skippedResults.length})`)
+      for (const skipped of skippedResults) {
+        core.warning(`Skipping ${skipped.filePath}: ${skipped.error}`)
+      }
+      core.endGroup()
+    }
+
     const totalErrorCount = totalConflictCount + totalInvalidValueCount
-    const skippedSuffix = skippedFileCount > 0 ? ` (${skippedFileCount} skipped)` : ''
+    const skippedSuffix = skippedResults.length > 0 ? ` (${skippedResults.length} skipped)` : ''
 
     core.setOutput('total-files-analyzed', jsonFiles.length)
 
@@ -83,14 +74,12 @@ export async function run() {
         parts.push(`${totalInvalidValueCount} invalid value(s)`)
       }
 
-      core.info('')
       core.setFailed(
         `Found ${parts.join(' and ')} across ${totalFilesWithErrors} file(s)${skippedSuffix}`,
       )
     }
     else {
-      const lintedFileCount = jsonFiles.length - skippedFileCount
-      core.info('')
+      const lintedFileCount = lintedResults.length
       core.info(
         `All ${lintedFileCount} file(s) linted successfully — no namespace conflicts or invalid values found${skippedSuffix}`,
       )

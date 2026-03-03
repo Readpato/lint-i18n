@@ -12,6 +12,8 @@ vi.mock('@actions/core', () => ({
   error: vi.fn(),
   setFailed: vi.fn(),
   setOutput: vi.fn(),
+  startGroup: vi.fn(),
+  endGroup: vi.fn(),
 }))
 
 const fixturesPath = resolve(import.meta.dirname, 'fixtures')
@@ -39,11 +41,8 @@ describe('run', () => {
       expect.stringContaining('namespace conflict'),
     )
     expect(core.error).toHaveBeenCalled()
-    expect(core.info).toHaveBeenCalledWith(
+    expect(core.startGroup).toHaveBeenCalledWith(
       expect.stringContaining('en.json'),
-    )
-    expect(core.info).toHaveBeenCalledWith(
-      expect.stringMatching(/Line \d+:.*conflicts with/),
     )
   })
 
@@ -87,6 +86,9 @@ describe('run', () => {
 
     await run()
 
+    expect(core.startGroup).toHaveBeenCalledWith(
+      expect.stringMatching(/Skipped files/),
+    )
     expect(core.warning).toHaveBeenCalledWith(
       expect.stringContaining('Skipping'),
     )
@@ -108,11 +110,8 @@ describe('run', () => {
     expect(core.setFailed).toHaveBeenCalledWith(
       expect.stringContaining('invalid value'),
     )
-    expect(core.info).toHaveBeenCalledWith(
+    expect(core.startGroup).toHaveBeenCalledWith(
       expect.stringContaining('en.json'),
-    )
-    expect(core.info).toHaveBeenCalledWith(
-      expect.stringMatching(/Line \d+:.*invalid value type/),
     )
   })
 
@@ -135,14 +134,8 @@ describe('run', () => {
     expect(failedMessage).toContain('namespace conflict')
     expect(failedMessage).toContain('invalid value')
 
-    expect(core.info).toHaveBeenCalledWith(
+    expect(core.startGroup).toHaveBeenCalledWith(
       expect.stringContaining('en.json'),
-    )
-    expect(core.info).toHaveBeenCalledWith(
-      expect.stringMatching(/Line \d+:.*invalid value type/),
-    )
-    expect(core.info).toHaveBeenCalledWith(
-      expect.stringMatching(/Line \d+:.*conflicts with/),
     )
   })
 })
