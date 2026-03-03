@@ -30719,13 +30719,13 @@ function info(message) {
  * @param name The name of the output group
  */
 function startGroup(name) {
-    issue('group', name);
+    command_issue('group', name);
 }
 /**
  * End an output group.
  */
 function endGroup() {
-    issue('endgroup');
+    command_issue('endgroup');
 }
 /**
  * Wrap an asynchronous function call in a group.
@@ -30924,13 +30924,6 @@ async function findJsonFilesRecursively(directoryPath) {
 
 
 
-function formatLinePrefix(line) {
-    return line !== undefined ? `Line ${line}: ` : '';
-}
-function reportError(filePath, line, message) {
-    error(message, { file: filePath, startLine: line });
-    return `  ${formatLinePrefix(line)}${message}`;
-}
 async function run() {
     try {
         const path = getInput('path', { required: true });
@@ -30942,39 +30935,38 @@ async function run() {
             return;
         }
         const analysisResults = await Promise.all(jsonFiles.map(file => analyzeLocaleFile(file)));
-        let skippedFileCount = 0;
+        const skippedResults = analysisResults.filter(result => result.error);
         let totalConflictCount = 0;
         let totalInvalidValueCount = 0;
         let totalFilesWithErrors = 0;
-        for (const result of analysisResults) {
-            if (result.error) {
-                info('');
-                warning(`Skipping ${result.filePath}: ${result.error}`);
-                skippedFileCount++;
-                continue;
-            }
-            const fileErrors = [];
-            for (const invalidValue of result.invalidValues) {
-                const message = `Key "${invalidValue.key}" has invalid value type "${invalidValue.actualType}" (expected "string")`;
-                fileErrors.push(reportError(result.filePath, invalidValue.line, message));
-            }
-            for (const conflict of result.conflicts) {
-                const message = `Key "${conflict.leafKey}" conflicts with "${conflict.conflictingDescendantKey}" — a key cannot be both a value and a namespace prefix`;
-                fileErrors.push(reportError(result.filePath, conflict.leafKeyLine, message));
-            }
-            if (fileErrors.length > 0) {
-                info('');
-                info(result.filePath);
-                for (const errorLine of fileErrors) {
-                    info(errorLine);
+        const lintedResults = analysisResults.filter(result => !result.error);
+        for (const result of lintedResults) {
+            const errorCount = result.invalidValues.length + result.conflicts.length;
+            if (errorCount > 0) {
+                startGroup(result.filePath);
+                for (const invalidValue of result.invalidValues) {
+                    const message = `Key "${invalidValue.key}" has invalid value type "${invalidValue.actualType}" (expected "string")`;
+                    error(message, { file: result.filePath, startLine: invalidValue.line });
                 }
+                for (const conflict of result.conflicts) {
+                    const message = `Key "${conflict.leafKey}" conflicts with "${conflict.conflictingDescendantKey}" — a key cannot be both a value and a namespace prefix`;
+                    error(message, { file: result.filePath, startLine: conflict.leafKeyLine });
+                }
+                endGroup();
                 totalFilesWithErrors++;
             }
             totalConflictCount += result.conflicts.length;
             totalInvalidValueCount += result.invalidValues.length;
         }
+        if (skippedResults.length > 0) {
+            startGroup(`Skipped files (${skippedResults.length})`);
+            for (const skipped of skippedResults) {
+                warning(`Skipping ${skipped.filePath}: ${skipped.error}`);
+            }
+            endGroup();
+        }
         const totalErrorCount = totalConflictCount + totalInvalidValueCount;
-        const skippedSuffix = skippedFileCount > 0 ? ` (${skippedFileCount} skipped)` : '';
+        const skippedSuffix = skippedResults.length > 0 ? ` (${skippedResults.length} skipped)` : '';
         setOutput('total-files-analyzed', jsonFiles.length);
         if (totalErrorCount > 0) {
             const parts = [];
@@ -30984,12 +30976,10 @@ async function run() {
             if (totalInvalidValueCount > 0) {
                 parts.push(`${totalInvalidValueCount} invalid value(s)`);
             }
-            info('');
             setFailed(`Found ${parts.join(' and ')} across ${totalFilesWithErrors} file(s)${skippedSuffix}`);
         }
         else {
-            const lintedFileCount = jsonFiles.length - skippedFileCount;
-            info('');
+            const lintedFileCount = lintedResults.length;
             info(`All ${lintedFileCount} file(s) linted successfully — no namespace conflicts or invalid values found${skippedSuffix}`);
         }
     }
