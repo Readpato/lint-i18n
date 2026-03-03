@@ -106,13 +106,17 @@ All 12 file(s) linted successfully — no namespace conflicts or invalid values 
 All 10 file(s) linted successfully — no namespace conflicts or invalid values found (2 skipped)
 ```
 
-**Errors found:**
+**Errors found (grouped per file, collapsible in GitHub Actions):**
 
 ```
-Error: Key "expand" conflicts with "expand.all" — a key cannot be both a value and a namespace prefix
-Error: Key "count" has invalid value type "number" (expected "string")
+▶ src/locales/en.json
+  Error: Key "expand" conflicts with "expand.all" — a key cannot be both a value and a namespace prefix
+  Error: Key "count" has invalid value type "number" (expected "string")
 
-Found 1 namespace conflict(s) and 1 invalid value(s) across 2 file(s) (1 skipped)
+▶ Skipped files (1)
+  Warning: Skipping src/locales/broken.json: Invalid JSON
+
+Found 1 namespace conflict(s) and 1 invalid value(s) across 1 file(s) (1 skipped)
 ```
 
 ## Development
