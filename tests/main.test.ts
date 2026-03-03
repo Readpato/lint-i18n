@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as core from '@actions/core'
 
@@ -16,22 +16,22 @@ vi.mock('@actions/core', () => ({
 
 const fixturesPath = resolve(import.meta.dirname, 'fixtures')
 
+function mockInputPath(fixture: string) {
+  vi.mocked(core.getInput).mockImplementation((name) => {
+    if (name === 'path') {
+      return resolve(fixturesPath, fixture)
+    }
+    return '{}'
+  })
+}
+
 describe('run', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   it('sets failed when conflicts are found', async () => {
-    vi.mocked(core.getInput).mockImplementation((name) => {
-      if (name === 'path') {
-        return resolve(fixturesPath, 'conflicting')
-      }
-      return '{}'
-    })
+    mockInputPath('conflicting')
 
     await run()
 
@@ -39,29 +39,28 @@ describe('run', () => {
       expect.stringContaining('namespace conflict'),
     )
     expect(core.error).toHaveBeenCalled()
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringContaining('en.json'),
+    )
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringMatching(/Line \d+:.*conflicts with/),
+    )
   })
 
   it('succeeds on clean files', async () => {
-    vi.mocked(core.getInput).mockImplementation((name) => {
-      if (name === 'path') {
-        return resolve(fixturesPath, 'valid')
-      }
-      return '{}'
-    })
+    mockInputPath('valid')
 
     await run()
 
     expect(core.setFailed).not.toHaveBeenCalled()
     expect(core.error).not.toHaveBeenCalled()
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringContaining('linted successfully'),
+    )
   })
 
   it('sets total-files-analyzed output', async () => {
-    vi.mocked(core.getInput).mockImplementation((name) => {
-      if (name === 'path') {
-        return resolve(fixturesPath, 'valid')
-      }
-      return '{}'
-    })
+    mockInputPath('valid')
 
     await run()
 
@@ -84,12 +83,7 @@ describe('run', () => {
   })
 
   it('warns on invalid JSON files', async () => {
-    vi.mocked(core.getInput).mockImplementation((name) => {
-      if (name === 'path') {
-        return resolve(fixturesPath, 'invalid')
-      }
-      return '{}'
-    })
+    mockInputPath('invalid')
 
     await run()
 
@@ -97,15 +91,13 @@ describe('run', () => {
       expect.stringContaining('Skipping'),
     )
     expect(core.setFailed).not.toHaveBeenCalled()
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringMatching(/linted successfully.*skipped/),
+    )
   })
 
   it('reports invalid value types', async () => {
-    vi.mocked(core.getInput).mockImplementation((name) => {
-      if (name === 'path') {
-        return resolve(fixturesPath, 'invalid-values')
-      }
-      return '{}'
-    })
+    mockInputPath('invalid-values')
 
     await run()
 
@@ -115,6 +107,42 @@ describe('run', () => {
     )
     expect(core.setFailed).toHaveBeenCalledWith(
       expect.stringContaining('invalid value'),
+    )
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringContaining('en.json'),
+    )
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringMatching(/Line \d+:.*invalid value type/),
+    )
+  })
+
+  it('reports both invalid values and conflicts for mixed-errors', async () => {
+    mockInputPath('mixed-errors')
+
+    await run()
+
+    expect(core.error).toHaveBeenCalledWith(
+      expect.stringContaining('invalid value type'),
+      expect.objectContaining({ file: expect.stringContaining('en.json') }),
+    )
+    expect(core.error).toHaveBeenCalledWith(
+      expect.stringContaining('conflicts with'),
+      expect.objectContaining({ file: expect.stringContaining('en.json') }),
+    )
+
+    const failedMessage = vi.mocked(core.setFailed).mock.calls[0]?.[0] ?? ''
+
+    expect(failedMessage).toContain('namespace conflict')
+    expect(failedMessage).toContain('invalid value')
+
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringContaining('en.json'),
+    )
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringMatching(/Line \d+:.*invalid value type/),
+    )
+    expect(core.info).toHaveBeenCalledWith(
+      expect.stringMatching(/Line \d+:.*conflicts with/),
     )
   })
 })

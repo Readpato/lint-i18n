@@ -127,10 +127,10 @@ describe('analyzeLocaleFile', () => {
     const result = await analyzeLocaleFile(resolve(fixturesPath, 'invalid-values/en.json'))
 
     expect(result.conflicts).toEqual([])
-    expect(result.invalidValues).toBeDefined()
-    expect(result.invalidValues!.length).toBeGreaterThan(0)
 
-    const keys = result.invalidValues!.map(error => error.key)
+    expect(result.invalidValues.length).toBeGreaterThan(0)
+
+    const keys = result.invalidValues.map(error => error.key)
 
     expect(keys).toContain('count')
     expect(keys).toContain('enabled')
@@ -141,10 +141,25 @@ describe('analyzeLocaleFile', () => {
   it('attaches line numbers to invalid values', async () => {
     const result = await analyzeLocaleFile(resolve(fixturesPath, 'invalid-values/en.json'))
 
-    const countError = result.invalidValues!.find(error => error.key === 'count')
+    const countError = result.invalidValues.find(error => error.key === 'count')
 
     expect(countError).toBeDefined()
-    expect(countError!.line).toBe(3)
+    expect(countError?.line).toBe(3)
+  })
+
+  it('returns both invalid values and conflicts for mixed-errors file', async () => {
+    const result = await analyzeLocaleFile(resolve(fixturesPath, 'mixed-errors/en.json'))
+
+    expect(result.invalidValues.length).toBeGreaterThan(0)
+    expect(result.conflicts.length).toBeGreaterThan(0)
+
+    const invalidKeys = result.invalidValues.map(error => error.key)
+
+    expect(invalidKeys).toContain('count')
+
+    const conflictPairs = result.conflicts.map(conflict => [conflict.leafKey, conflict.conflictingDescendantKey])
+
+    expect(conflictPairs).toContainEqual(['expand', 'expand.all'])
   })
 
   it('returns error for empty object', async () => {
