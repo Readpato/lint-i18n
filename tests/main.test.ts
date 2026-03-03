@@ -41,7 +41,7 @@ describe('run', () => {
       expect.stringContaining('namespace conflict'),
     )
     expect(core.error).toHaveBeenCalled()
-    expect(core.startGroup).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining('en.json'),
     )
   })
@@ -110,7 +110,7 @@ describe('run', () => {
     expect(core.setFailed).toHaveBeenCalledWith(
       expect.stringContaining('invalid value'),
     )
-    expect(core.startGroup).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining('en.json'),
     )
   })
@@ -134,7 +134,7 @@ describe('run', () => {
     expect(failedMessage).toContain('namespace conflict')
     expect(failedMessage).toContain('invalid value')
 
-    expect(core.startGroup).toHaveBeenCalledWith(
+    expect(core.info).toHaveBeenCalledWith(
       expect.stringContaining('en.json'),
     )
   })

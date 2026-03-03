@@ -30,19 +30,19 @@ export async function run() {
       const errorCount = result.invalidValues.length + result.conflicts.length
 
       if (errorCount > 0) {
-        core.startGroup(result.filePath)
+        core.info(result.filePath)
 
         for (const invalidValue of result.invalidValues) {
-          const message = `Key "${invalidValue.key}" has invalid value type "${invalidValue.actualType}" (expected "string")`
+          const linePrefix = invalidValue.line !== undefined ? `Line ${invalidValue.line}: ` : ''
+          const message = `${linePrefix}Key "${invalidValue.key}" has invalid value type "${invalidValue.actualType}" (expected "string")`
           core.error(message, { file: result.filePath, startLine: invalidValue.line })
         }
 
         for (const conflict of result.conflicts) {
-          const message = `Key "${conflict.leafKey}" conflicts with "${conflict.conflictingDescendantKey}" — a key cannot be both a value and a namespace prefix`
+          const linePrefix = conflict.leafKeyLine !== undefined ? `Line ${conflict.leafKeyLine}: ` : ''
+          const message = `${linePrefix}Key "${conflict.leafKey}" conflicts with "${conflict.conflictingDescendantKey}" — a key cannot be both a value and a namespace prefix`
           core.error(message, { file: result.filePath, startLine: conflict.leafKeyLine })
         }
-
-        core.endGroup()
         totalFilesWithErrors++
       }
 
