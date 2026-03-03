@@ -30803,33 +30803,67 @@ const promises_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.ur
 function isPlainJsonObject(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+/** Maps each JSON key to its 1-based line number by scanning the raw file content. */
+function buildKeyLineMap(rawContent) {
+    const lineMap = new Map();
+    const lines = rawContent.split('\n');
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex];
+        if (line === undefined) {
+            continue;
+        }
+        /**
+         * Matches a JSON key declaration: optional whitespace, `"key":` (e.g. `  "expand.all": "value"`).
+         * Note: does not handle escaped quotes within JSON keys (e.g. `"key\"name"`).
+         */
+        const match = line.match(/^\s*"([^"]+)"\s*:/);
+        if (match?.[1] !== undefined) {
+            lineMap.set(match[1], lineIndex + 1);
+        }
+    }
+    return lineMap;
+}
+/** Validates that all values in a parsed locale object are strings. */
+function validateLocaleValues(data) {
+    if (Object.keys(data).length === 0) {
+        throw new Error('Cannot validate an empty locale object');
+    }
+    const validData = {};
+    const invalidValues = [];
+    for (const [key, value] of Object.entries(data)) {
+        if (typeof value === 'string') {
+            validData[key] = value;
+        }
+        else {
+            invalidValues.push({
+                key,
+                actualType: Array.isArray(value) ? 'array' : typeof value,
+            });
+        }
+    }
+    return { validData, invalidValues };
+}
 /** Detects flat-key namespace conflicts where a key is both a leaf value and a prefix of another key. */
 function detectFlatKeyNamespaceConflicts(localeData) {
-    const existingKeyLookup = new Set(Object.keys(localeData));
+    const localeKeys = new Set(Object.keys(localeData));
+    if (localeKeys.size === 0) {
+        throw new Error('Cannot detect conflicts in an empty locale object');
+    }
     const conflicts = [];
-    for (const key of existingKeyLookup) {
+    for (const key of localeKeys) {
         const segments = key.split('.');
         if (segments.length < 2) {
             continue;
         }
+        let prefix = segments[0] ?? '';
         for (let segmentIndex = 1; segmentIndex < segments.length; segmentIndex++) {
-            const parentKeySegment = segments.slice(0, segmentIndex).join('.');
-            if (!existingKeyLookup.has(parentKeySegment)) {
-                continue;
+            if (localeKeys.has(prefix)) {
+                conflicts.push({
+                    leafKey: prefix,
+                    conflictingDescendantKey: key,
+                });
             }
-            const parentValue = localeData[parentKeySegment];
-            if (parentValue === undefined) {
-                continue;
-            }
-            if (isPlainJsonObject(parentValue)) {
-                continue;
-            }
-            const leafValueType = Array.isArray(parentValue) ? 'array' : typeof parentValue;
-            conflicts.push({
-                leafKey: parentKeySegment,
-                conflictingDescendantKey: key,
-                leafValueType,
-            });
+            prefix += `.${segments[segmentIndex]}`;
         }
     }
     return conflicts;
@@ -30840,14 +30874,31 @@ async function analyzeLocaleFile(filePath) {
         const content = await (0,promises_namespaceObject.readFile)(filePath, 'utf-8');
         const parsed = JSON.parse(content);
         if (!isPlainJsonObject(parsed)) {
-            return { filePath, conflicts: [], error: 'File does not contain a JSON object' };
+            return { filePath, conflicts: [], invalidValues: [], error: 'File does not contain a JSON object' };
         }
-        const conflicts = detectFlatKeyNamespaceConflicts(parsed);
-        return { filePath, conflicts };
+        if (Object.keys(parsed).length === 0) {
+            return { filePath, conflicts: [], invalidValues: [], error: 'File contains no translation keys' };
+        }
+        const { validData, invalidValues } = validateLocaleValues(parsed);
+        const hasValidKeys = invalidValues.length < Object.keys(parsed).length;
+        const conflicts = hasValidKeys
+            ? detectFlatKeyNamespaceConflicts(validData)
+            : [];
+        if (invalidValues.length > 0 || conflicts.length > 0) {
+            const keyLineMap = buildKeyLineMap(content);
+            for (const invalidValue of invalidValues) {
+                invalidValue.line = keyLineMap.get(invalidValue.key);
+            }
+            for (const conflict of conflicts) {
+                conflict.leafKeyLine = keyLineMap.get(conflict.leafKey);
+                conflict.conflictingDescendantKeyLine = keyLineMap.get(conflict.conflictingDescendantKey);
+            }
+        }
+        return { filePath, conflicts, invalidValues };
     }
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return { filePath, conflicts: [], error: message };
+        return { filePath, conflicts: [], invalidValues: [], error: message };
     }
 }
 
@@ -30873,39 +30924,77 @@ async function findJsonFilesRecursively(directoryPath) {
 
 
 
+function formatLinePrefix(line) {
+    return line !== undefined ? `Line ${line}: ` : '';
+}
+function reportError(filePath, line, message) {
+    error(message, { file: filePath, startLine: line });
+    return `  ${formatLinePrefix(line)}${message}`;
+}
 async function run() {
     try {
         const path = getInput('path', { required: true });
-        getInput('rules');
         info(`Linting i18n files in: ${path}`);
         const jsonFiles = await findJsonFilesRecursively(path);
         info(`Found ${jsonFiles.length} JSON file(s)`);
-        const analyzedFileResults = [];
-        for (const file of jsonFiles) {
-            const result = await analyzeLocaleFile(file);
-            analyzedFileResults.push(result);
+        if (jsonFiles.length === 0) {
+            setFailed(`No JSON files found in: ${path}`);
+            return;
+        }
+        const analysisResults = await Promise.all(jsonFiles.map(file => analyzeLocaleFile(file)));
+        let skippedFileCount = 0;
+        let totalConflictCount = 0;
+        let totalInvalidValueCount = 0;
+        let totalFilesWithErrors = 0;
+        for (const result of analysisResults) {
             if (result.error) {
+                info('');
                 warning(`Skipping ${result.filePath}: ${result.error}`);
+                skippedFileCount++;
                 continue;
             }
-            for (const conflict of result.conflicts) {
-                error(`Namespace conflict in ${result.filePath}: "${conflict.leafKey}" (${conflict.leafValueType}) is also a prefix of "${conflict.conflictingDescendantKey}"`);
+            const fileErrors = [];
+            for (const invalidValue of result.invalidValues) {
+                const message = `Key "${invalidValue.key}" has invalid value type "${invalidValue.actualType}" (expected "string")`;
+                fileErrors.push(reportError(result.filePath, invalidValue.line, message));
             }
-        }
-        const filesWithConflicts = analyzedFileResults.filter(result => result.conflicts.length > 0);
-        let totalConflictCount = 0;
-        for (const result of filesWithConflicts) {
+            for (const conflict of result.conflicts) {
+                const message = `Key "${conflict.leafKey}" conflicts with "${conflict.conflictingDescendantKey}" — a key cannot be both a value and a namespace prefix`;
+                fileErrors.push(reportError(result.filePath, conflict.leafKeyLine, message));
+            }
+            if (fileErrors.length > 0) {
+                info('');
+                info(result.filePath);
+                for (const errorLine of fileErrors) {
+                    info(errorLine);
+                }
+                totalFilesWithErrors++;
+            }
             totalConflictCount += result.conflicts.length;
+            totalInvalidValueCount += result.invalidValues.length;
         }
+        const totalErrorCount = totalConflictCount + totalInvalidValueCount;
+        const skippedSuffix = skippedFileCount > 0 ? ` (${skippedFileCount} skipped)` : '';
         setOutput('total-files-analyzed', jsonFiles.length);
-        if (totalConflictCount > 0) {
-            setFailed(`Found ${totalConflictCount} namespace conflict(s) across ${filesWithConflicts.length} file(s)`);
+        if (totalErrorCount > 0) {
+            const parts = [];
+            if (totalConflictCount > 0) {
+                parts.push(`${totalConflictCount} namespace conflict(s)`);
+            }
+            if (totalInvalidValueCount > 0) {
+                parts.push(`${totalInvalidValueCount} invalid value(s)`);
+            }
+            info('');
+            setFailed(`Found ${parts.join(' and ')} across ${totalFilesWithErrors} file(s)${skippedSuffix}`);
+        }
+        else {
+            const lintedFileCount = jsonFiles.length - skippedFileCount;
+            info('');
+            info(`All ${lintedFileCount} file(s) linted successfully — no namespace conflicts or invalid values found${skippedSuffix}`);
         }
     }
     catch (error) {
-        if (error instanceof Error) {
-            setFailed(error.message);
-        }
+        setFailed(error instanceof Error ? error.message : String(error));
     }
 }
 run();
