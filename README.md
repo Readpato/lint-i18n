@@ -56,7 +56,7 @@ jobs:
 
 | Output | Description |
 |--------|-------------|
-| `total-files-analyzed` | Number of locale files analyzed (including skipped files) |
+| `total-files-analyzed` | Total JSON files found (including skipped files) |
 
 ## Flat-key format
 
@@ -97,27 +97,29 @@ Here `"expand"` holds a string value but also acts as a namespace for `"expand.a
 **All files pass:**
 
 ```
-All 12 file(s) linted successfully — no namespace conflicts or invalid values found
+Result: All 12 file(s) linted successfully — no namespace conflicts or invalid values found
 ```
 
 **All files pass with skipped files:**
 
 ```
-All 10 file(s) linted successfully — no namespace conflicts or invalid values found (2 skipped)
+Result: All 10 file(s) linted successfully — no namespace conflicts or invalid values found (2 skipped)
 ```
 
-**Errors found (grouped per file, collapsible in GitHub Actions):**
+**Errors found:**
 
 ```
-▶ src/locales/en.json
-  Error: Key "expand" conflicts with "expand.all" — a key cannot be both a value and a namespace prefix
-  Error: Key "count" has invalid value type "number" (expected "string")
+src/locales/en.json
+Line 2: Key "expand" conflicts with "expand.all" — a key cannot be both a value and a namespace prefix
+Line 3: Key "count" has invalid value type "number" (expected "string")
 
 ▶ Skipped files (1)
-  Warning: Skipping src/locales/broken.json: Invalid JSON
+Skipping src/locales/broken.json: Invalid JSON
 
-Found 1 namespace conflict(s) and 1 invalid value(s) across 1 file(s) (1 skipped)
+Result: Found 1 namespace conflict(s) and 1 invalid value(s) across 1 file(s) (1 skipped)
 ```
+
+> GitHub Actions adds `Error:` and `Warning:` prefixes and coloring automatically.
 
 ## Development
 

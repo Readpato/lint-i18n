@@ -1,5 +1,5 @@
 name: 'Lint i18n'
-description: 'Lint i18n JSON key structure (naming conventions, nesting depth, missing keys across locales)'
+description: 'Lint flat-key i18n JSON files for namespace conflicts and invalid value types'
 branding:
   icon: 'database'
   color: 'green'
@@ -9,8 +9,7 @@ inputs:
     required: true
 outputs:
   total-files-analyzed:
-    description: 'Number of locale files analyzed'
+    description: 'Total JSON files found (including skipped files)'
 runs:
   using: 'node20'
   main: 'dist/index.js'
-  
