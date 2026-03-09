@@ -90,7 +90,7 @@ export function detectFlatKeyNamespaceConflicts(localeData: FlatKeyLocaleData) {
   return conflicts
 }
 
-/** Reads, parses, and analyzes a single locale file for namespace conflicts. */
+/** Reads, parses, and analyzes a single locale file for namespace conflicts and invalid values. */
 export async function analyzeLocaleFile(filePath: string): Promise<LocaleFileAnalysisResult> {
   try {
     const content = await readFile(filePath, 'utf-8')
@@ -120,7 +120,6 @@ export async function analyzeLocaleFile(filePath: string): Promise<LocaleFileAna
 
       for (const conflict of conflicts) {
         conflict.leafKeyLine = keyLineMap.get(conflict.leafKey)
-        conflict.conflictingDescendantKeyLine = keyLineMap.get(conflict.conflictingDescendantKey)
       }
     }
 

@@ -9,8 +9,6 @@ export interface NamespaceConflict {
   leafKeyLine?: number
   /** The longer dotted key that treats the leaf as a namespace (e.g. `"expand.all"`). */
   conflictingDescendantKey: string
-  /** Line number of the descendant key in the source file (1-based, undefined when not file-sourced). */
-  conflictingDescendantKeyLine?: number
 }
 
 /** A locale entry whose value is not a string. */
@@ -20,7 +18,7 @@ export interface InvalidValueError {
   line?: number
 }
 
-/** Result of analyzing a single locale file for namespace conflicts. */
+/** Result of analyzing a single locale file for namespace conflicts and invalid values. */
 export interface LocaleFileAnalysisResult {
   /** Absolute path to the analyzed file. */
   filePath: string
