@@ -30868,7 +30868,7 @@ function detectFlatKeyNamespaceConflicts(localeData) {
     }
     return conflicts;
 }
-/** Reads, parses, and analyzes a single locale file for namespace conflicts. */
+/** Reads, parses, and analyzes a single locale file for namespace conflicts and invalid values. */
 async function analyzeLocaleFile(filePath) {
     try {
         const content = await (0,promises_namespaceObject.readFile)(filePath, 'utf-8');
@@ -30891,7 +30891,6 @@ async function analyzeLocaleFile(filePath) {
             }
             for (const conflict of conflicts) {
                 conflict.leafKeyLine = keyLineMap.get(conflict.leafKey);
-                conflict.conflictingDescendantKeyLine = keyLineMap.get(conflict.conflictingDescendantKey);
             }
         }
         return { filePath, conflicts, invalidValues };
@@ -30977,11 +30976,11 @@ async function run() {
             if (totalInvalidValueCount > 0) {
                 parts.push(`${totalInvalidValueCount} invalid value(s)`);
             }
-            setFailed(`Found ${parts.join(' and ')} across ${totalFilesWithErrors} file(s)${skippedSuffix}`);
+            setFailed(`Result: Found ${parts.join(' and ')} across ${totalFilesWithErrors} file(s)${skippedSuffix}`);
         }
         else {
             const lintedFileCount = lintedResults.length;
-            info(`All ${lintedFileCount} file(s) linted successfully — no namespace conflicts or invalid values found${skippedSuffix}`);
+            info(`Result: All ${lintedFileCount} file(s) linted successfully — no namespace conflicts or invalid values found${skippedSuffix}`);
         }
     }
     catch (error) {
