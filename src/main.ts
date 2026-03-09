@@ -75,13 +75,13 @@ export async function run() {
       }
 
       core.setFailed(
-        `Found ${parts.join(' and ')} across ${totalFilesWithErrors} file(s)${skippedSuffix}`,
+        `Result: Found ${parts.join(' and ')} across ${totalFilesWithErrors} file(s)${skippedSuffix}`,
       )
     }
     else {
       const lintedFileCount = lintedResults.length
       core.info(
-        `All ${lintedFileCount} file(s) linted successfully — no namespace conflicts or invalid values found${skippedSuffix}`,
+        `Result: All ${lintedFileCount} file(s) linted successfully — no namespace conflicts or invalid values found${skippedSuffix}`,
       )
     }
   }
